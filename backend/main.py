@@ -2,10 +2,19 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
-from api.predict import router as predict_router
-from api.simulate import router as simulate_router
-from api.evaluate import router as evaluate_router
-from api.explain import router as explain_router
+if __package__:
+    from .api.predict import router as predict_router
+    from .api.simulate import router as simulate_router
+    from .api.evaluate import router as evaluate_router
+    from .api.explain import router as explain_router
+    app_module = "backend.main:app"
+else:
+    # Also support `python main.py` when the working directory is backend/.
+    from api.predict import router as predict_router
+    from api.simulate import router as simulate_router
+    from api.evaluate import router as evaluate_router
+    from api.explain import router as explain_router
+    app_module = "main:app"
 
 app = FastAPI(title="Inventory Intelligence Backend")
 
@@ -27,4 +36,4 @@ def read_root():
     return {"status": "DeepBoost FastAPI is running"}
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run(app_module, host="0.0.0.0", port=8000, reload=True)

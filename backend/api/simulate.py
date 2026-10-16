@@ -1,6 +1,10 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
-from kinetics.q10 import calculate_q10_decay
+if __package__ and "." in __package__:
+    from ..kinetics.q10 import calculate_q10_decay
+else:
+    # Support importing through top-level `api` when running from backend/.
+    from kinetics.q10 import calculate_q10_decay
 import random
 
 router = APIRouter()
