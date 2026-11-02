@@ -208,35 +208,3 @@ python -m backend.evaluation.evaluate_hybrid
 
 On macOS or Linux, use the same commands after activating the virtual environment.
 
-## Upload and generated files
-
-Upload the source code, `inventory_dataset_1M.csv`, the schema file, the dependency files, Docker files, README, guides, and screenshots. Do not upload:
-
-- `backend/inventory.sqlite3`
-- `backend/models/lgbm_static.txt`
-- `backend/models/hybrid_lstm.pt`
-- `backend/models/scaler_stat.pkl`
-- `backend/models/scaler_dyn.pkl`
-- `backend/models/metadata.json`
-- `backend/models/metrics.json`
-- `.venv`
-- `frontend/node_modules`
-- `frontend/dist`
-- Python caches
-
-The database and model artifacts are generated locally. After downloading the source, run the database setup and model training commands before starting the application.
-
-## Repository cleanup and persistence
-
-Runtime SQLite files, local environment files, Python caches, test caches, and frontend build output are ignored by Git. The real training CSV remains the source dataset for the model. The database is created and seeded by migrations, so a fresh checkout still has useful saved rows without a random data generator. Because trained files are not included, model training must be completed before prediction features are used.
-
-SQLite uses delete journal mode. Completed writes do not leave `inventory.sqlite3-wal` or `inventory.sqlite3-shm` files.
-
-## Setup and training guides
-
-The repository includes two documents for developers who are setting up the project for the first time:
-
-- [PDF setup and run guide](docs/setup-guide.pdf)
-- [Word setup and model training guide](docs/setup-and-training-guide.docx)
-
-The PDF gives the short installation, deployment, and run procedure. The Word document explains the complete setup and model training process from the beginning, including the dataset, environment, training stages, evaluation, saved model files, database initialization, and common checks. Both guides use general application language and do not list API routes.
