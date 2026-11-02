@@ -1,15 +1,20 @@
 from fastapi import APIRouter
+from ..models.registry import load_registry
 
 router = APIRouter()
 
 @router.get("/explain/latest")
 def get_feature_importances():
-    # Returns the relative importance values extracted from the LightGBM branch
-    # and the temporal attention weights from the LSTM branch.
+    registry = load_registry()
+    model = registry["lightgbm"]
+    names = registry["metadata"]["feature_names"]
+    values = model.feature_importance(importance_type="gain")
+    total = float(values.sum()) or 1.0
     return [
-        {"name": "Temperature (LSTM)", "importance": 0.85},
-        {"name": "pH (LightGBM)", "importance": 0.65},
-        {"name": "Moisture (LightGBM)", "importance": 0.55},
-        {"name": "CO2 Level", "importance": 0.20},
-        {"name": "Light (Lux)", "importance": 0.10}
+        {"name": name, "importance": round(float(value) / total, 4)}
+        for name, value in sorted(
+            zip(names, values),
+            key=lambda item: item[1],
+            reverse=True,
+        )
     ]

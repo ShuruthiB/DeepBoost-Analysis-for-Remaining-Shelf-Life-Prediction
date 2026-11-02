@@ -1,22 +1,24 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-import uvicorn
 
 if __package__:
-    from .api.predict import router as predict_router
-    from .api.simulate import router as simulate_router
-    from .api.evaluate import router as evaluate_router
+    from .api.evaluate import router as evaluation_router
     from .api.explain import router as explain_router
-    app_module = "backend.main:app"
+    from .api.inventory import router as inventory_router
+    from .api.predict import router as predict_router
+    from .api.train import router as train_router
 else:
-    # Also support `python main.py` when the working directory is backend/.
-    from api.predict import router as predict_router
-    from api.simulate import router as simulate_router
-    from api.evaluate import router as evaluate_router
-    from api.explain import router as explain_router
-    app_module = "main:app"
+    import sys
+    from pathlib import Path
 
-app = FastAPI(title="Inventory Intelligence Backend")
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from backend.api.evaluate import router as evaluation_router
+    from backend.api.explain import router as explain_router
+    from backend.api.inventory import router as inventory_router
+    from backend.api.predict import router as predict_router
+    from backend.api.train import router as train_router
+
+app = FastAPI(title="SpoilSense AI Backend")
 
 app.add_middleware(
     CORSMiddleware,
@@ -27,13 +29,16 @@ app.add_middleware(
 
 # Register all modular routers
 app.include_router(predict_router, prefix="/api")
-app.include_router(simulate_router, prefix="/api")
-app.include_router(evaluate_router, prefix="/api")
+app.include_router(evaluation_router, prefix="/api")
 app.include_router(explain_router, prefix="/api")
+app.include_router(train_router, prefix="/api")
+app.include_router(inventory_router, prefix="/api")
 
 @app.get("/")
 def read_root():
-    return {"status": "DeepBoost FastAPI is running"}
+    return {"status": "SpoilSense AI API is running"}
 
 if __name__ == "__main__":
-    uvicorn.run(app_module, host="0.0.0.0", port=8000, reload=True)
+    import uvicorn
+
+    uvicorn.run("backend.main:app", host="0.0.0.0", port=8000, reload=True)

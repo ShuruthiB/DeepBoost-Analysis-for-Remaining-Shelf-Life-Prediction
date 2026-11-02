@@ -1,74 +1,63 @@
-import React, { useState, useEffect } from 'react';
-import { AlertCircle, TrendingUp, PackageCheck, AlertTriangle, DollarSign, Activity } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { AlertCircle, TrendingUp, PackageCheck, AlertTriangle, Activity } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import './views.css';
-
-const healthData = [
-  { name: 'Banana', safe: 4000, warning: 800, critical: 200 },
-  { name: 'Orange', safe: 3500, warning: 400, critical: 50 },
-  { name: 'Pineapple', safe: 1200, warning: 600, critical: 300 },
-  { name: 'Tomato', safe: 2800, warning: 900, critical: 150 },
-];
+import { apiRequest } from '../lib/api';
 
 export const DashboardView: React.FC = () => {
-  const [logs, setLogs] = useState([
-    { id: 1, type: 'critical', time: '10:42 AM', text: 'Shelf 3 (Pineapple): LSTM detected +4°C heat spike. Projected shelf life reduced by 40%.' },
-    { id: 2, type: 'warning', time: '10:15 AM', text: 'Shelf 2 (Banana): LightGBM identified suboptimal moisture (0.87).' },
-    { id: 3, type: 'safe', time: '09:00 AM', text: 'Shelf 1 (Orange): Batch stabilized. Hybrid model confidence interval narrowed.' }
-  ]);
-
-  // Sped up to 4 seconds so the live update is highly visible during demos
+  const [inventory, setInventory] = useState<any[]>([]);
   useEffect(() => {
-    const interval = setInterval(() => {
-      const now = new Date();
-      const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      const randomEvent = Math.random();
-      let newLog;
-      if (randomEvent > 0.7) {
-        newLog = { id: Date.now(), type: 'critical', time: timeStr, text: `Shelf ${Math.floor(Math.random()*5)+1}: Unscheduled temperature variance (+2.1°C). PyTorch LSTM flagged anomaly.` };
-      } else if (randomEvent > 0.4) {
-        newLog = { id: Date.now(), type: 'warning', time: timeStr, text: `Shelf ${['A','B','C','D'][Math.floor(Math.random()*4)]}: Micro-climate shift detected. Recalculating shelf life via LightGBM...` };
-      } else {
-        newLog = { id: Date.now(), type: 'safe', time: timeStr, text: `System nominal. Physics baseline matches DeepBoost tensor output.` };
-      }
-      setLogs(prev => [newLog, ...prev].slice(0, 5));
-    }, 4000); 
-    
-    return () => clearInterval(interval);
+    apiRequest<any[]>('/inventory')
+      .then(setInventory)
+      .catch(error => console.error(error));
   }, []);
+  const healthData = Array.from(new Set(inventory.map(item => item.variety))).map(name => ({
+    name,
+    safe: inventory.filter(item => item.variety === name && item.status === 'SAFE').length,
+    warning: inventory.filter(item => item.variety === name && item.status === 'WARNING').length,
+    critical: inventory.filter(item => item.variety === name && item.status === 'CRITICAL').length,
+  }));
+  const analyzed = inventory.filter(item => item.days != null);
+  const criticalCount = inventory.filter(item => item.status === 'CRITICAL').length;
+  const atRisk = inventory
+    .filter(item => item.days != null && Number(item.days) <= 10)
+    .sort((left, right) => Number(left.days) - Number(right.days))
+    .slice(0, 3);
+  const averageDays = analyzed.length
+    ? analyzed.reduce((sum, item) => sum + Number(item.days), 0) / analyzed.length
+    : 0;
 
   return (
     <div className="view-container">
       <h1>System Overview</h1>
-      <p className="subtitle">Real-time inventory intelligence and financial risk assessment.</p>
       
       <div className="kpi-grid-4">
         <div className="kpi-card safe">
           <div className="kpi-icon"><PackageCheck size={24}/></div>
           <div className="kpi-data">
             <h3>Total Active Stock</h3>
-            <p className="kpi-value">14,900</p>
+            <p className="kpi-value">{inventory.length}</p>
           </div>
         </div>
         <div className="kpi-card warning">
           <div className="kpi-icon"><TrendingUp size={24}/></div>
           <div className="kpi-data">
             <h3>Avg. Shelf Life</h3>
-            <p className="kpi-value">14.2 Days</p>
+            <p className="kpi-value">{averageDays.toFixed(1)} Days</p>
           </div>
         </div>
         <div className="kpi-card critical">
           <div className="kpi-icon"><AlertCircle size={24}/></div>
           <div className="kpi-data">
             <h3>Critical (&lt; 5 Days)</h3>
-            <p className="kpi-value">700 Units</p>
+            <p className="kpi-value">{criticalCount}</p>
           </div>
         </div>
         <div className="kpi-card highlight">
-          <div className="kpi-icon"><DollarSign size={24}/></div>
+        <div className="kpi-icon"><TrendingUp size={24}/></div>
           <div className="kpi-data">
-            <h3>Value at Risk</h3>
-            <p className="kpi-value">$3,450</p>
+              <h3>At-Risk Batches</h3>
+              <p className="kpi-value">{atRisk.length}</p>
           </div>
         </div>
       </div>
@@ -95,27 +84,18 @@ export const DashboardView: React.FC = () => {
         <div className="panel list-panel">
           <h2>Top At-Risk Batches</h2>
           <div className="risk-list">
-            <div className="risk-item">
-              <div className="risk-info">
-                <strong>INV-003 (Pineapple)</strong>
-                <span>Shelf C • Moisture Anomaly</span>
+            {atRisk.map(item => (
+              <div className="risk-item" key={item.id}>
+                <div className="risk-info">
+                  <strong>{item.id} ({item.variety})</strong>
+                  <span>Shelf {item.shelf} • {item.status} priority</span>
+                </div>
+                <div className={`risk-badge ${item.status.toLowerCase()}`}>
+                  {item.days} Days Left
+                </div>
               </div>
-              <div className="risk-badge critical">2 Days Left</div>
-            </div>
-            <div className="risk-item">
-              <div className="risk-info">
-                <strong>INV-112 (Banana)</strong>
-                <span>Shelf A • High Temp Exposure</span>
-              </div>
-              <div className="risk-badge critical">3 Days Left</div>
-            </div>
-            <div className="risk-item">
-              <div className="risk-info">
-                <strong>INV-089 (Tomato)</strong>
-                <span>Shelf D • pH Degradation</span>
-              </div>
-              <div className="risk-badge warning">6 Days Left</div>
-            </div>
+            ))}
+            {atRisk.length === 0 && <p className="subtitle">No batches require immediate attention.</p>}
           </div>
         </div>
       </div>
@@ -123,14 +103,22 @@ export const DashboardView: React.FC = () => {
       <div className="panel">
         <h2>Live Network Telemetry Log</h2>
         <ul className="alert-list log-list" style={{ minHeight: '180px' }}>
-          {logs.map((log) => (
+          {inventory.filter(item => item.status !== 'Pending').slice(0, 5).map((item) => {
+            const log = {
+              id: item.id,
+              type: item.status.toLowerCase(),
+              time: 'Database',
+              text: `${item.id} (${item.variety}) analyzed by the hybrid model: ${item.days ?? '--'} days remaining.`
+            };
+            return (
             <li key={log.id} className={`alert-item ${log.type}`} style={{ animation: 'fadeIn 0.5s ease-in' }}>
               {log.type === 'critical' && <AlertTriangle size={16}/>}
               {log.type === 'warning' && <Activity size={16}/>}
               {log.type === 'safe' && <PackageCheck size={16}/>}
               <span><strong>{log.time} - </strong> {log.text}</span>
             </li>
-          ))}
+            );
+          })}
         </ul>
       </div>
     </div>

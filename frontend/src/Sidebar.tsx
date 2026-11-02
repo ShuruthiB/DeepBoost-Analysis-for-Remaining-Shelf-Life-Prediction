@@ -1,7 +1,7 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Package, Activity, BarChart2, Moon, Sun } from 'lucide-react';
-import { useTheme } from './contexts/ThemeContext';
+import { LayoutDashboard, Package, BarChart2, TrendingUp, RadioTower, Moon, Sun } from 'lucide-react';
+import { useTheme } from './contexts/useTheme';
 
 export const Sidebar: React.FC = () => {
   const { theme, toggleTheme } = useTheme();
@@ -9,7 +9,7 @@ export const Sidebar: React.FC = () => {
   return (
     <aside className="sidebar">
       <div className="sidebar-header">
-        <h2>Inventory Intelligence</h2>
+        <h2>SpoilSense AI</h2>
       </div>
       
       <nav className="sidebar-nav">
@@ -23,14 +23,19 @@ export const Sidebar: React.FC = () => {
           <span>Inventory</span>
         </NavLink>
         
-        <NavLink to="/simulation" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-          <Activity size={20} />
-          <span>Simulation</span>
+        <NavLink to="/projection" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+          <TrendingUp size={20} />
+          <span>Shelf Life Projection</span>
         </NavLink>
         
         <NavLink to="/analytics" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
           <BarChart2 size={20} />
           <span>Analytics</span>
+        </NavLink>
+
+        <NavLink to="/monitor-shelves" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+          <RadioTower size={20} />
+          <span>Monitor Shelves</span>
         </NavLink>
       </nav>
 

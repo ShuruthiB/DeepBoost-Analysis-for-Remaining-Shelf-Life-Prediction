@@ -1,14 +1,7 @@
-import React, { useState } from 'react';
-import { Search, Filter, Plus, X, BarChart2 } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { ChevronLeft, ChevronRight, Search, Plus, X, BarChart2 } from 'lucide-react';
 import './views.css';
-
-const initialInventory = [
-  { id: 'INV-001', batch: 'BN-882', supplier: 'AgriCorp', variety: 'Banana', shelf: 'A', ph: 4.8, moisture: 0.75, temp: 15, status: 'Pending', days: '--' },
-  { id: 'INV-002', batch: 'OR-110', supplier: 'SunFarms', variety: 'Orange', shelf: 'B', ph: 3.8, moisture: 0.87, temp: 4, status: 'Pending', days: '--' },
-  { id: 'INV-003', batch: 'PN-405', supplier: 'TropiGrow', variety: 'Pineapple', shelf: 'C', ph: 3.6, moisture: 0.86, temp: 18, status: 'Pending', days: '--' },
-  { id: 'INV-004', batch: 'TM-992', supplier: 'RedVine', variety: 'Tomato', shelf: 'D', ph: 4.3, moisture: 0.94, temp: 16, status: 'Pending', days: '--' },
-  { id: 'INV-005', batch: 'BN-883', supplier: 'AgriCorp', variety: 'Banana', shelf: 'A', ph: 4.7, moisture: 0.76, temp: 21, status: 'Pending', days: '--' }
-];
+import { apiRequest } from '../lib/api';
 
 const optimalRanges: any = {
   'Banana': { ph: '4.5 - 5.2', moisture: '75% - 80%', temp: '13.0°C - 15.0°C' },
@@ -18,49 +11,36 @@ const optimalRanges: any = {
 };
 
 export const InventoryView: React.FC = () => {
-  const [inventory, setInventory] = useState(initialInventory);
+  const [inventory, setInventory] = useState<any[]>([]);
   const [search, setSearch] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedBatch, setSelectedBatch] = useState<any>(null);
+  const [page, setPage] = useState(1);
   const [newBatch, setNewBatch] = useState({ variety: 'Banana', batch: '', supplier: '', shelf: '', ph: 4.5, moisture: 0.8, temp: 10 });
 
-  const handlePredict = async (item: any) => {
-    try {
-      const response = await fetch("http://localhost:8000/api/predict", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          variety: item.variety,
-          shelf: item.shelf,
-          ph: item.ph,
-          moisture: item.moisture,
-          temperatures: [item.temp - 1, item.temp, item.temp, item.temp, item.temp]
-        })
+  useEffect(() => {
+    apiRequest<any[]>('/inventory')
+      .then(setInventory)
+      .catch(error => {
+        console.error(error);
+        setInventory([]);
       });
-      const data = await response.json();
-      
-      const updatedItem = { ...item, status: data.status, days: data.predicted_days };
-      
-      // Update global table state
-      setInventory(prev => prev.map(invItem => invItem.id === item.id ? updatedItem : invItem));
-      
-      // FORCIBLY open the selected batch panel immediately upon clicking analyze so details are never hidden
-      setSelectedBatch(updatedItem);
-      
-      return updatedItem;
-    } catch (err) {
-      console.error(err);
-      return item;
-    }
-  };
+  }, []);
 
   const handleAddBatch = async () => {
-    const newId = `INV-00${inventory.length + 1}`;
-    const tempItem = { ...newBatch, id: newId, status: 'Scanning...', days: 0 };
-    setInventory([...inventory, tempItem]);
-    setShowAddModal(false);
-    
-    await handlePredict(tempItem);
+    const newId = `INV-${String(inventory.length + 1).padStart(3, '0')}`;
+    try {
+      const savedItem = await apiRequest<any>('/inventory', {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...newBatch, id: newId })
+      });
+      setInventory(prev => [...prev, savedItem]);
+      setShowAddModal(false);
+      setSelectedBatch(savedItem);
+    } catch (error) {
+      console.error(error);
+    }
   };
 
   const filteredInventory = inventory.filter(item => 
@@ -68,13 +48,19 @@ export const InventoryView: React.FC = () => {
     item.variety.toLowerCase().includes(search.toLowerCase()) ||
     item.supplier.toLowerCase().includes(search.toLowerCase())
   );
+  const pageSize = 8;
+  const pageCount = Math.max(1, Math.ceil(filteredInventory.length / pageSize));
+  const currentPage = Math.min(page, pageCount);
+  const pagedInventory = filteredInventory.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize,
+  );
 
   return (
     <div className="view-container">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h1>Inventory Database</h1>
-          <p className="subtitle">Manage batches and trigger live DeepBoost API inferences.</p>
         </div>
         <div className="inventory-controls">
           <div className="search-bar">
@@ -83,7 +69,7 @@ export const InventoryView: React.FC = () => {
               type="text" 
               placeholder="Search batch, variety, supplier..." 
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
             />
           </div>
           <button className="btn-secondary" onClick={() => setShowAddModal(true)}><Plus size={16}/> Add Batch</button>
@@ -107,13 +93,13 @@ export const InventoryView: React.FC = () => {
             </tr>
           </thead>
           <tbody>
-            {filteredInventory.map(item => (
+            {pagedInventory.map(item => (
               <tr key={item.id} onClick={() => setSelectedBatch(item)}>
                 <td><strong>{item.id}</strong></td>
                 <td>{item.batch}</td>
-                <td>{item.supplier}</td>
+                <td>{item.supplier || 'Unassigned'}</td>
                 <td>{item.variety}</td>
-                <td>{item.shelf}</td>
+                <td>{item.shelf || 'Unassigned'}</td>
                 <td>{item.ph}</td>
                 <td>{(item.moisture * 100).toFixed(0)}%</td>
                 <td>{item.temp}°C</td>
@@ -121,9 +107,9 @@ export const InventoryView: React.FC = () => {
                   <span className={`status-badge ${item.status.toLowerCase()}`}>{item.status}</span>
                 </td>
                 <td>
-                  <button className="btn-predict" onClick={(e) => { e.stopPropagation(); handlePredict(item); }}>
+                  <button className="btn-predict" onClick={(e) => { e.stopPropagation(); setSelectedBatch(item); }}>
                     <BarChart2 size={14} style={{ marginRight: '5px', verticalAlign: 'middle' }}/>
-                    Analyze
+                    View
                   </button>
                 </td>
               </tr>
@@ -133,6 +119,30 @@ export const InventoryView: React.FC = () => {
             )}
           </tbody>
         </table>
+        {filteredInventory.length > 0 && (
+          <div className="pagination-controls">
+            <span>Showing {(currentPage - 1) * pageSize + 1}-{Math.min(currentPage * pageSize, filteredInventory.length)} of {filteredInventory.length} batches</span>
+            <div>
+              <button
+                className="btn-secondary"
+                type="button"
+                disabled={currentPage === 1}
+                onClick={() => setPage(currentPage - 1)}
+              >
+                <ChevronLeft size={16} /> Previous
+              </button>
+              <span style={{ margin: '0 12px' }}>Page {currentPage} of {pageCount}</span>
+              <button
+                className="btn-secondary"
+                type="button"
+                disabled={currentPage === pageCount}
+                onClick={() => setPage(currentPage + 1)}
+              >
+                Next <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {selectedBatch && (
@@ -171,22 +181,13 @@ export const InventoryView: React.FC = () => {
                     <td>{optimalRanges[selectedBatch.variety]?.temp || '10.0°C - 15.0°C'}</td>
                     <td style={{ color: '#ef4444' }}>Critical (LSTM)</td>
                   </tr>
-                  <tr>
-                    <td><strong>Ambient CO2</strong></td>
-                    <td>420 ppm (Simulated)</td>
-                    <td>&lt; 500 ppm</td>
-                    <td>Low (Ignored)</td>
-                  </tr>
                 </tbody>
               </table>
             </div>
             <div className={`result-panel ${selectedBatch.status.toLowerCase()}`} style={{ marginTop: 0 }}>
               <h3 style={{ marginTop: 0 }}>AI Shelf Life Prediction</h3>
-              <div className="result-huge" style={{ fontSize: '48px' }}>{selectedBatch.days} Days</div>
+              <div className="result-huge">{selectedBatch.days ?? '--'} Days</div>
               <p style={{ margin: 0 }}>Model Output Status: <strong>{selectedBatch.status}</strong></p>
-              <button className="btn-primary" style={{ marginTop: '15px', width: '100%' }} onClick={() => handlePredict(selectedBatch)}>
-                Force Network Recalculation
-              </button>
             </div>
           </div>
         </div>
