@@ -1,4 +1,10 @@
+import os
+import sys
+from pathlib import Path
+
 from fastapi import FastAPI
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
 if __package__:
@@ -34,9 +40,32 @@ app.include_router(explain_router, prefix="/api")
 app.include_router(train_router, prefix="/api")
 app.include_router(inventory_router, prefix="/api")
 
-@app.get("/")
-def read_root():
-    return {"status": "SpoilSense AI API is running"}
+def _frontend_dir() -> Path | None:
+    """Built React app: bundled by PyInstaller, or frontend/dist in a normal checkout."""
+    base = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[1]))
+    for candidate in (base / "frontend_dist", base / "frontend" / "dist"):
+        if (candidate / "index.html").is_file():
+            return candidate
+    return None
+
+
+_FRONTEND = _frontend_dir()
+
+if _FRONTEND:
+    app.mount("/assets", StaticFiles(directory=_FRONTEND / "assets"), name="assets")
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    def serve_spa(full_path: str):
+        if full_path.startswith("api/"):
+            return {"detail": "Not Found"}
+        target = (_FRONTEND / full_path).resolve()
+        if full_path and target.is_file() and _FRONTEND.resolve() in target.parents:
+            return FileResponse(target)
+        return FileResponse(_FRONTEND / "index.html")
+else:
+    @app.get("/")
+    def read_root():
+        return {"status": "SpoilSense AI API is running"}
 
 if __name__ == "__main__":
     import uvicorn

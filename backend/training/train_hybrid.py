@@ -137,6 +137,9 @@ def train(config: TrainingConfig = TrainingConfig()) -> dict:
     joblib.dump(static_scaler, config.model_dir / "scaler_stat.pkl")
     joblib.dump(dynamic_scaler, config.model_dir / "scaler_dyn.pkl")
     torch.save(hybrid.state_dict(), config.model_dir / "hybrid_lstm.pt")
+    from ..models.runtime import export_runtime_files  # torch-free copy for the packaged app
+
+    export_runtime_files(config.model_dir)
     metrics = {
         "rows": int(len(frame)),
         "train_rows": int(len(train_frame)),

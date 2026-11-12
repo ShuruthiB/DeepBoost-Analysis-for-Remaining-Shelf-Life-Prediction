@@ -4,7 +4,6 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from ..data.loader import DEFAULT_DATASET_PATH
-from ..training.train_hybrid import TrainingConfig, train
 
 router = APIRouter()
 
@@ -20,6 +19,8 @@ class TrainRequest(BaseModel):
 def train_model(request: TrainRequest):
     if request.epochs < 1 or request.batch_size < 1:
         raise HTTPException(status_code=422, detail="epochs and batch_size must be positive.")
+    from ..training.train_hybrid import TrainingConfig, train  # needs torch: not in packaged app
+
     return train(TrainingConfig(
         dataset_path=request.dataset or DEFAULT_DATASET_PATH,
         max_rows=request.max_rows,

@@ -2,7 +2,6 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from ..data.loader import DEFAULT_DATASET_PATH
-from ..evaluation.evaluate_hybrid import evaluate
 
 router = APIRouter()
 
@@ -15,6 +14,7 @@ class EvaluationRequest(BaseModel):
 @router.get("/models/comparison")
 def get_metrics():
     try:
+        from ..evaluation.evaluate_hybrid import evaluate
         return evaluate()
     except (FileNotFoundError, OSError, RuntimeError, ValueError, KeyError) as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
@@ -23,6 +23,7 @@ def get_metrics():
 @router.post("/models/evaluate")
 def evaluate_model(request: EvaluationRequest):
     try:
+        from ..evaluation.evaluate_hybrid import evaluate
         return evaluate(
             request.dataset or DEFAULT_DATASET_PATH,
             max_rows=request.max_rows,

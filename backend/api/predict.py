@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import numpy as np
-import torch
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from ..data.schema import TEMPERATURE_COLUMNS
 from ..features.sequencing import lightgbm_features
 from ..models.registry import load_registry
+from ..models.runtime import hybrid_residual
 
 router = APIRouter()
 _registry: dict | None = None
@@ -52,20 +52,30 @@ def run_prediction(data: PredictRequest) -> dict:
     import pandas as pd
 
     frame = pd.DataFrame([row])
-    static = registry["scaler_static"].transform(frame[["pH", "Moisture"]].to_numpy())
-    dynamic = registry["scaler_dynamic"].transform(
-        frame[list(TEMPERATURE_COLUMNS)].to_numpy()
-    ).reshape(1, len(TEMPERATURE_COLUMNS), 1)
     lgb_features, _ = lightgbm_features(frame, metadata["varieties"])
     lgb_prediction = registry["lightgbm"].predict(lgb_features).astype(np.float32)
-    with torch.no_grad():
-        residual_days = float(
-            registry["hybrid"](
-                torch.from_numpy(dynamic.astype(np.float32)),
-                torch.from_numpy(lgb_prediction.reshape(-1, 1)),
-                torch.from_numpy(static.astype(np.float32)),
-            ).item()
-        )
+    if "runtime" in registry:  # NumPy-only inference (packaged app)
+        residual_days = float(hybrid_residual(
+            registry["runtime"],
+            frame[list(TEMPERATURE_COLUMNS)].to_numpy(dtype=np.float32),
+            frame[["pH", "Moisture"]].to_numpy(dtype=np.float32),
+            lgb_prediction,
+        )[0])
+    else:  # torch fallback when runtime files have not been exported yet
+        import torch
+
+        static = registry["scaler_static"].transform(frame[["pH", "Moisture"]].to_numpy())
+        dynamic = registry["scaler_dynamic"].transform(
+            frame[list(TEMPERATURE_COLUMNS)].to_numpy()
+        ).reshape(1, len(TEMPERATURE_COLUMNS), 1)
+        with torch.no_grad():
+            residual_days = float(
+                registry["hybrid"](
+                    torch.from_numpy(dynamic.astype(np.float32)),
+                    torch.from_numpy(lgb_prediction.reshape(-1, 1)),
+                    torch.from_numpy(static.astype(np.float32)),
+                ).item()
+            )
     predicted_days = float(lgb_prediction[0] + residual_days)
     predicted_days = max(0.0, min(predicted_days, 40.0))
     status = "CRITICAL" if predicted_days <= 5 else "WARNING" if predicted_days <= 10 else "SAFE"

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import sqlite3
 from pathlib import Path
 from typing import Any
@@ -14,7 +15,9 @@ from .schema import (
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-DATABASE_PATH = (PROJECT_ROOT / "backend" / "inventory.sqlite3").resolve()
+DATABASE_PATH = Path(
+    os.environ.get("DEEPBOOST_DATABASE_PATH") or PROJECT_ROOT / "backend" / "inventory.sqlite3"
+).resolve()
 
 
 def _production_seed_rows(rows: tuple[tuple[object, ...], ...]) -> list[tuple[object, ...]]:
